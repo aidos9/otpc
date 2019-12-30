@@ -38,13 +38,6 @@ fn main() {
                 .takes_value(true)
                 .value_name("LABEL"),
         )
-        .arg(
-            Arg::with_name("edit")
-                .short("e")
-                .help("Edit an item")
-                .takes_value(true)
-                .value_name("LABEL"),
-        )
         .get_matches();
 
     match otpc::run_startup_checks() {
@@ -64,6 +57,14 @@ fn main() {
             Some(label) => otpc::run_remove(&String::from(label)),
             None => {
                 eprintln!("A value is required to remove an item.");
+                std::process::exit(1);
+            }
+        }
+    } else if matches.is_present("code") {
+        match matches.value_of("code") {
+            Some(label) => otpc::run_display_code(&String::from(label)),
+            None => {
+                eprintln!("A value is required to show the code of an item.");
                 std::process::exit(1);
             }
         }
