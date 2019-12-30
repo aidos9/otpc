@@ -59,5 +59,13 @@ fn main() {
         otpc::run_new();
     } else if matches.is_present("list") {
         otpc::run_list();
+    } else if matches.is_present("remove") {
+        match matches.value_of("remove") {
+            Some(label) => otpc::run_remove(&String::from(label)),
+            None => {
+                eprintln!("A value is required to remove an item.");
+                std::process::exit(1);
+            }
+        }
     }
 }

@@ -9,10 +9,53 @@ use lotp::totp;
 use std::error::Error;
 use std::fs;
 use std::io::{stdin, stdout, Write};
+use std::path::Path;
 
-pub fn run_list() {
+pub fn run_remove(label: &String) {
+    if !storage_location_exists() {
+        println!("No database file found. Please add an item first.");
+        return;
+    }
+
     match item_storage::retrieve_items(&storage_location()) {
         Ok(ref mut items) => {
+            let mut index = 0;
+
+            while index < items.len() {
+                if &items[index].label == label {
+                    items.remove(index);
+                } else {
+                    index += 1;
+                }
+            }
+
+            match item_storage::write_items(&storage_location(), items) {
+                Ok(()) => println!("Successfully removed '{}' from the database.", label),
+                Err(e) => {
+                    eprintln!("An error occurred when writing the database: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("An error occurred when reading the database: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+pub fn run_list() {
+    if !storage_location_exists() {
+        println!("No database file found. Please add an item first.");
+        return;
+    }
+
+    match item_storage::retrieve_items(&storage_location()) {
+        Ok(ref mut items) => {
+            if items.len() == 0 {
+                println!("No items in the database.");
+            }
+
             for item in items {
                 let code: String;
 
@@ -64,6 +107,7 @@ pub fn run_list() {
 pub fn run_new() {
     let mut label = String::new();
 
+    println!();
     while label.is_empty() {
         label = String::new();
         print!("Label: ");
@@ -220,28 +264,38 @@ pub fn run_new() {
         split_time: period_num,
     };
 
-    match item_storage::retrieve_items(&storage_location()) {
-        Ok(ref mut items) => {
-            for lbl in items.into_iter().map(|item| item.label.clone()) {
-                if lbl == item.label {
-                    eprintln!("An item with this label already exists.");
-                    std::process::exit(1);
+    if storage_location_exists() {
+        match item_storage::retrieve_items(&storage_location()) {
+            Ok(ref mut items) => {
+                for lbl in items.into_iter().map(|item| item.label.clone()) {
+                    if lbl == item.label {
+                        eprintln!("An item with this label already exists.");
+                        std::process::exit(1);
+                    }
+                }
+
+                items.push(item);
+
+                match item_storage::write_items(&storage_location(), items) {
+                    Ok(()) => (),
+                    Err(e) => {
+                        eprintln!("An error occurred when writing the database: {}", e);
+                        std::process::exit(1);
+                    }
                 }
             }
-
-            items.push(item);
-
-            match item_storage::write_items(&storage_location(), items) {
-                Ok(()) => (),
-                Err(e) => {
-                    eprintln!("An error occurred when writing the database: {}", e);
-                    std::process::exit(1);
-                }
+            Err(e) => {
+                eprintln!("An error occurred when reading the database: {}", e);
+                std::process::exit(1);
             }
         }
-        Err(e) => {
-            eprintln!("An error occurred when reading the database: {}", e);
-            std::process::exit(1);
+    } else {
+        match item_storage::write_items(&storage_location(), &vec![item]) {
+            Ok(()) => (),
+            Err(e) => {
+                eprintln!("An error occurred when writing the database: {}", e);
+                std::process::exit(1);
+            }
         }
     }
 
@@ -272,6 +326,10 @@ pub fn run_startup_checks() -> Option<String> {
         }
         None => return Some(String::from("Could not determine home directory.")),
     }
+}
+
+fn storage_location_exists() -> bool {
+    return Path::new(&storage_location()).exists();
 }
 
 fn storage_location() -> String {

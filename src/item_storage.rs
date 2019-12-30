@@ -1,15 +1,28 @@
 use crate::item::Item;
 use std::error::Error;
 use std::fs::OpenOptions;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
 pub fn write_items(path: &String, items: &Vec<Item>) -> Result<(), String> {
+    if Path::new(path).exists() {
+        match std::fs::remove_file(path) {
+            Ok(_) => (),
+            Err(_) => return Err(String::from("Could not remove the old file.")),
+        }
+    }
+
     match OpenOptions::new().create(true).write(true).open(path) {
         Ok(file) => {
-            let writer = BufWriter::new(file);
-            match serde_json::to_writer(writer, items) {
-                Ok(_) => return Ok(()),
+            let mut writer = BufWriter::new(file);
+            match serde_json::to_string(items) {
+                Ok(s) => match writer.write_all(s.as_bytes()) {
+                    Ok(_) => {
+                        let _ = writer.flush();
+                        return Ok(());
+                    }
+                    Err(e) => return Err(String::from(e.description())),
+                },
                 Err(e) => return Err(String::from(e.description())),
             }
         }
