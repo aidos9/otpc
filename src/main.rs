@@ -57,7 +57,7 @@ fn main() {
 
     if matches.is_present("new") {
         otpc::run_new();
-    }else if matches.is_present("list") {
+    } else if matches.is_present("list") {
         otpc::run_list();
     }
 }

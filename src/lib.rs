@@ -1,14 +1,14 @@
 extern crate cursive;
 extern crate dirs;
+extern crate lotp;
 extern crate serde;
 extern crate serde_json;
-extern crate lotp;
 pub mod item;
 pub mod item_storage;
+use lotp::totp;
 use std::error::Error;
 use std::fs;
 use std::io::{stdin, stdout, Write};
-use lotp::totp;
 
 pub fn run_list() {
     match item_storage::retrieve_items(&storage_location()) {
@@ -17,23 +17,32 @@ pub fn run_list() {
                 let code: String;
 
                 if item.digits == 8 {
-                    match totp::generate_8_digit_totp_string(&item.secret, &(item.split_time as u64)) {
+                    match totp::generate_8_digit_totp_string(
+                        &item.secret,
+                        &(item.split_time as u64),
+                    ) {
                         Ok(s) => code = s,
                         Err(e) => {
                             eprintln!("{}", e.description());
                             std::process::exit(1);
                         }
                     }
-                }else if item.digits == 7 {
-                    match totp::generate_7_digit_totp_string(&item.secret, &(item.split_time as u64)) {
+                } else if item.digits == 7 {
+                    match totp::generate_7_digit_totp_string(
+                        &item.secret,
+                        &(item.split_time as u64),
+                    ) {
                         Ok(s) => code = s,
                         Err(e) => {
                             eprintln!("{}", e.description());
                             std::process::exit(1);
                         }
                     }
-                }else {
-                    match totp::generate_6_digit_totp_string(&item.secret, &(item.split_time as u64)) {
+                } else {
+                    match totp::generate_6_digit_totp_string(
+                        &item.secret,
+                        &(item.split_time as u64),
+                    ) {
                         Ok(s) => code = s,
                         Err(e) => {
                             eprintln!("{}", e.description());
@@ -146,10 +155,10 @@ pub fn run_new() {
             period = String::from("30");
         }
 
-        is_valid = is_number(&period);
+        is_valid = is_number(&period) && period != "0";
 
         if !is_valid {
-            eprintln!("The period must be number.");
+            eprintln!("The period must be number greater than 0.");
         } else {
             break;
         }
