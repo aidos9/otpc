@@ -9,7 +9,8 @@ edition = "2018"
 [dependencies]
 lotp = { git = "https://github.com/aidos9/lotp" }
 clap = "2.33"
-cursive = "0.13"
+tui = "0.8"
+termion = "1.5"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 dirs = "2.0"

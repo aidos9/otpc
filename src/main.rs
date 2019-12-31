@@ -68,5 +68,7 @@ fn main() {
                 std::process::exit(1);
             }
         }
+    } else if matches.is_present("interactive") {
+        otpc::run_interactive();
     }
 }

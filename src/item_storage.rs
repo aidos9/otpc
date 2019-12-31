@@ -4,6 +4,21 @@ use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
 
+pub fn storage_location_exists() -> bool {
+    return Path::new(&storage_location()).exists();
+}
+
+pub fn storage_location() -> String {
+    match dirs::home_dir() {
+        Some(mut path) => {
+            path.push(".otpc");
+            path.push("items.json");
+            return String::from(path.to_str().unwrap());
+        }
+        None => return String::new(),
+    }
+}
+
 pub fn write_items(path: &String, items: &Vec<Item>) -> Result<(), String> {
     if Path::new(path).exists() {
         match std::fs::remove_file(path) {

@@ -1,14 +1,20 @@
-extern crate cursive;
 extern crate dirs;
 extern crate lotp;
 extern crate serde;
 extern crate serde_json;
-pub mod item;
-pub mod item_storage;
+extern crate termion;
+extern crate tui;
+mod interactive;
+mod item;
+mod item_storage;
+use item_storage::{storage_location, storage_location_exists};
 use std::error::Error;
 use std::fs;
 use std::io::{stdin, stdout, Write};
-use std::path::Path;
+
+pub fn run_interactive() {
+    interactive::run();
+}
 
 pub fn run_display_code(label: &String) {
     if !storage_location_exists() {
@@ -320,21 +326,6 @@ pub fn run_startup_checks() -> Option<String> {
             }
         }
         None => return Some(String::from("Could not determine home directory.")),
-    }
-}
-
-fn storage_location_exists() -> bool {
-    return Path::new(&storage_location()).exists();
-}
-
-fn storage_location() -> String {
-    match dirs::home_dir() {
-        Some(mut path) => {
-            path.push(".otpc");
-            path.push("items.json");
-            return String::from(path.to_str().unwrap());
-        }
-        None => return String::new(),
     }
 }
 
