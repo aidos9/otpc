@@ -1,6 +1,10 @@
 use crate::item::Item;
 use crate::item_storage;
 use std::io;
+use std::sync::mpsc;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::TryRecvError;
+use std::thread;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
@@ -9,11 +13,9 @@ use tui::layout::{Alignment, Constraint, Direction, Layout};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, SelectableList, Text, Widget};
 use tui::Terminal;
-use std::sync::mpsc;
-use std::sync::mpsc::Receiver;
-use std::sync::mpsc::TryRecvError;
-use std::{thread, time};
+use clipboard::{ClipboardProvider, ClipboardContext};
 
+#[derive(PartialEq)]
 enum TermMenu {
     New,
     Edit,
@@ -22,10 +24,19 @@ enum TermMenu {
     None,
 }
 
+#[derive(Clone)]
+enum CopyStatus {
+    None,
+    Success,
+    Fail,
+}
+
 pub struct Term {
     terminal: Terminal<TermionBackend<RawTerminal<io::Stdout>>>,
     items: Vec<Item>,
     current_menu: TermMenu,
+    selected_index: usize,
+    copy_status: CopyStatus,
 }
 
 impl Term {
@@ -67,10 +78,14 @@ impl Term {
             terminal,
             items,
             current_menu: TermMenu::None,
+            selected_index: 0,
+            copy_status: CopyStatus::None,
         };
     }
 
-    pub fn start_main_menu(&mut self) -> Result<(), &'static str> {
+    pub fn start(&mut self) -> Result<(), &'static str> {
+        self.current_menu = TermMenu::Main;
+
         match self.terminal.clear() {
             Ok(_) => (),
             Err(_) => return Err("Could not clear the terminal."),
@@ -81,48 +96,60 @@ impl Term {
             Err(_) => return Err("Could not hide the cursor."),
         }
 
-        let mut selected_index = 0;
         let receiver = Term::spawn_stdin_channel();
 
         loop {
-            self.draw_main_menu(selected_index)?;
+            self.draw_menu()?;
 
             match receiver.try_recv() {
-                Ok(c) => {
-                    match c {
-                        Ok(k) => match k {
-                            Key::Ctrl(c) => {
-                                if c == 'c' {
-                                    return Ok(());
-                                }
+                Ok(c) => match c {
+                    Ok(k) => match k {
+                        Key::Ctrl(c) => {
+                            if c == 'c' {
+                                return Ok(());
                             }
-                            Key::Char(c) => {
-                                if c == 'q' {
-                                    self.quit();
-                                }
+                        }
+                        Key::Char(c) => {
+                            if c == 'q' {
+                                self.quit();
+                            }else if c == 'c' {
+                                self.copy();
                             }
-                            Key::Up => {
-                                if selected_index != 0 {
-                                    selected_index -= 1;
-                                } else {
-                                    selected_index = self.items.len() - 1;
-                                }
+                        }
+                        Key::Up => {
+                            self.reset_changing_fields();
+
+                            if self.selected_index != 0 {
+                                self.selected_index -= 1;
+                            } else {
+                                self.selected_index = self.items.len() - 1;
                             }
-                            Key::Down => {
-                                if selected_index == self.items.len() - 1 {
-                                    selected_index = 0;
-                                } else {
-                                    selected_index += 1;
-                                }
+                        }
+                        Key::Down => {
+                            self.reset_changing_fields();
+
+                            if self.selected_index == self.items.len() - 1 {
+                                self.selected_index = 0;
+                            } else {
+                                self.selected_index += 1;
                             }
-                            _ => (),
                         },
-                        Err(_) => return Err("Could not read user input."),
-                    }
+                        _ => (),
+                    },
+                    Err(_) => return Err("Could not read user input."),
                 },
                 Err(TryRecvError::Empty) => (),
-                Err(TryRecvError::Disconnected) => return Err("Could not connect to the input thread.")
+                Err(TryRecvError::Disconnected) => {
+                    return Err("Could not connect to the input thread.")
+                }
             }
+        }
+    }
+
+    fn draw_menu(&mut self) -> Result<(), &'static str> {
+        match &self.current_menu {
+            TermMenu::Main => return self.draw_main_menu(self.selected_index),
+            _ => return self.draw_main_menu(self.selected_index),
         }
     }
 
@@ -138,6 +165,8 @@ impl Term {
 
             items.push(format!("{} - {}", item.label, code_string));
         }
+
+        let copy_status = self.copy_status.clone();
 
         match self.terminal.draw(|mut f| {
             let chunks = Layout::default()
@@ -156,16 +185,30 @@ impl Term {
                 .items(&items)
                 .select(Some(selected_index))
                 .style(style)
-                .highlight_style(style.fg(Color::LightGreen).modifier(Modifier::BOLD))
+                .highlight_style(style.fg(Color::Magenta).modifier(Modifier::BOLD))
                 .render(&mut f, chunks[0]);
 
-            let text = [
+            let copy_text;
+                match copy_status {
+                    CopyStatus::None => {
+                        copy_text = Text::raw("c - Copy      ");
+                    },
+                    CopyStatus::Success => {
+                        copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Green));
+                    },
+                    CopyStatus::Fail => {
+                        copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Red));
+                    }
+                }
+
+            let text = vec![
                 Text::raw("n - New      "),
                 Text::raw("e - Edit      "),
-                Text::raw("c - Copy      "),
+                copy_text,
                 Text::raw("r - Delete      "),
                 Text::raw("q - Quit"),
             ];
+
             Paragraph::new(text.iter())
                 .block(Block::default().borders(Borders::ALL))
                 .alignment(Alignment::Center)
@@ -205,5 +248,31 @@ impl Term {
         });
 
         return rx;
+    }
+
+    fn copy(&mut self) {
+        let code;
+
+        if self.current_menu == TermMenu::Main {
+            match self.items[self.selected_index].get_code() {
+                Ok(c) => code = c,
+                Err(_) => {
+                    self.copy_status = CopyStatus::Fail;
+                    return;
+                },
+            }
+        }else {
+            return;
+        }
+
+        let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+        match ctx.set_contents(code) {
+            Ok(_) => self.copy_status = CopyStatus::Success,
+            Err(_) => self.copy_status = CopyStatus::Fail,
+        }
+    }
+
+    fn reset_changing_fields(&mut self) {
+        self.copy_status = CopyStatus::None;
     }
 }

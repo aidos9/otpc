@@ -4,6 +4,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate termion;
 extern crate tui;
+extern crate clipboard;
 mod interactive;
 mod item;
 mod item_storage;

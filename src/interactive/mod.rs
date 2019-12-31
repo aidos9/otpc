@@ -6,7 +6,7 @@ pub fn run() {
     {
         let mut term = Term::new();
 
-        match term.start_main_menu() {
+        match term.start() {
             Ok(_) => err = None,
             Err(e) => err = Some(e),
         }
