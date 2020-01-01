@@ -1,10 +1,12 @@
 use crate::item::Item;
 use crate::item_storage;
+use clipboard::{ClipboardContext, ClipboardProvider};
 use std::io;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::sync::mpsc::TryRecvError;
+use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
+use std::time::Duration;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::{IntoRawMode, RawTerminal};
@@ -13,19 +15,17 @@ use tui::layout::{Alignment, Constraint, Direction, Layout};
 use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, SelectableList, Text, Widget};
 use tui::Terminal;
-use clipboard::{ClipboardProvider, ClipboardContext};
 
 #[derive(PartialEq)]
 enum TermMenu {
     New,
     Edit,
     Main,
-    Individual,
     None,
 }
 
 #[derive(Clone)]
-enum CopyStatus {
+enum Status {
     None,
     Success,
     Fail,
@@ -36,7 +36,8 @@ pub struct Term {
     items: Vec<Item>,
     current_menu: TermMenu,
     selected_index: usize,
-    copy_status: CopyStatus,
+    copy_status: Status,
+    alternate_footer: String,
 }
 
 impl Term {
@@ -79,7 +80,8 @@ impl Term {
             items,
             current_menu: TermMenu::None,
             selected_index: 0,
-            copy_status: CopyStatus::None,
+            copy_status: Status::None,
+            alternate_footer: String::new(),
         };
     }
 
@@ -101,7 +103,9 @@ impl Term {
         loop {
             self.draw_menu()?;
 
-            match receiver.try_recv() {
+            // We use a timeout because otherwise the loop runs too fast and consumes alot of the CPU, this means w still receive input instantly but
+            // also can update the codes every second.
+            match receiver.recv_timeout(Duration::from_secs(1)) {
                 Ok(c) => match c {
                     Ok(k) => match k {
                         Key::Ctrl(c) => {
@@ -112,8 +116,10 @@ impl Term {
                         Key::Char(c) => {
                             if c == 'q' {
                                 self.quit();
-                            }else if c == 'c' {
+                            } else if c == 'c' {
                                 self.copy();
+                            } else if c == 'r' {
+                                self.remove();
                             }
                         }
                         Key::Up => {
@@ -133,13 +139,13 @@ impl Term {
                             } else {
                                 self.selected_index += 1;
                             }
-                        },
+                        }
                         _ => (),
                     },
                     Err(_) => return Err("Could not read user input."),
                 },
-                Err(TryRecvError::Empty) => (),
-                Err(TryRecvError::Disconnected) => {
+                Err(RecvTimeoutError::Timeout) => (),
+                Err(RecvTimeoutError::Disconnected) => {
                     return Err("Could not connect to the input thread.")
                 }
             }
@@ -189,17 +195,17 @@ impl Term {
                 .render(&mut f, chunks[0]);
 
             let copy_text;
-                match copy_status {
-                    CopyStatus::None => {
-                        copy_text = Text::raw("c - Copy      ");
-                    },
-                    CopyStatus::Success => {
-                        copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Green));
-                    },
-                    CopyStatus::Fail => {
-                        copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Red));
-                    }
+            match copy_status {
+                Status::None => {
+                    copy_text = Text::raw("c - Copy      ");
                 }
+                Status::Success => {
+                    copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Green));
+                }
+                Status::Fail => {
+                    copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Red));
+                }
+            }
 
             let text = vec![
                 Text::raw("n - New      "),
@@ -257,22 +263,30 @@ impl Term {
             match self.items[self.selected_index].get_code() {
                 Ok(c) => code = c,
                 Err(_) => {
-                    self.copy_status = CopyStatus::Fail;
+                    self.copy_status = Status::Fail;
                     return;
-                },
+                }
             }
-        }else {
+        } else {
             return;
         }
 
         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
         match ctx.set_contents(code) {
-            Ok(_) => self.copy_status = CopyStatus::Success,
-            Err(_) => self.copy_status = CopyStatus::Fail,
+            Ok(_) => self.copy_status = Status::Success,
+            Err(_) => self.copy_status = Status::Fail,
+        }
+    }
+
+    fn remove(&mut self) {
+        if self.current_menu == TermMenu::Main {
+        } else {
+            return;
         }
     }
 
     fn reset_changing_fields(&mut self) {
-        self.copy_status = CopyStatus::None;
+        self.copy_status = Status::None;
+        self.alternate_footer = String::new();
     }
 }
