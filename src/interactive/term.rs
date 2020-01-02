@@ -17,6 +17,7 @@ use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, SelectableList, Text, Widget};
 use tui::Terminal;
 use unicode_width::UnicodeWidthStr;
+use crate::is_base_32_c;
 
 #[derive(PartialEq)]
 enum TermMenu {
@@ -197,10 +198,12 @@ impl Term {
                                 .insert(self.field_cursor_x as usize, c);
                             self.field_cursor_x += 1;
                         } else if self.selected_index == 1 {
-                            self.new_item_secret
-                                .get_or_insert(String::new())
-                                .insert(self.field_cursor_x as usize, c);
-                            self.field_cursor_x += 1;
+                            if is_base_32_c(c) {
+                                self.new_item_secret
+                                    .get_or_insert(String::new())
+                                    .insert(self.field_cursor_x as usize, c);
+                                self.field_cursor_x += 1;
+                            }
                         } else if self.selected_index == 2 {
                             if c.is_numeric() {
                                 self.new_item_digits
@@ -215,6 +218,13 @@ impl Term {
                                     .insert(self.field_cursor_x as usize, c);
                                 self.field_cursor_x += 1;
                             }
+                        }
+                    }else if c == '\n' {
+                        if self.selected_index < 3 {
+                            self.selected_index += 1;
+                            self.new_item_menu_check_x();
+                        }else {
+                            // Add
                         }
                     }
                 }
@@ -414,6 +424,8 @@ impl Term {
             }
         }
 
+        let selected_index = self.selected_index;
+
         match self.terminal.draw(|mut f| {
             let root_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -446,19 +458,25 @@ impl Term {
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[0]);
             Paragraph::new(secret_input.iter())
-                .block(Block::default().borders(Borders::ALL).title("Secret"))
+                .block(Block::default().borders(Borders::ALL).title("Secret (Base-32)"))
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[1]);
             Paragraph::new(digits_input.iter())
-                .block(Block::default().borders(Borders::ALL).title("Digits"))
+                .block(Block::default().borders(Borders::ALL).title("Digits (6/7/8)"))
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[2]);
             Paragraph::new(period_input.iter())
-                .block(Block::default().borders(Borders::ALL).title("Period"))
+                .block(Block::default().borders(Borders::ALL).title("Period (seconds)"))
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[3]);
 
-            let text = vec![Text::raw("Esc - Back")];
+            let mut text = vec![Text::raw("Esc - Back")];
+
+            if selected_index == 3 {
+                text.insert(0, Text::raw("Enter - Add      "));
+            }else {
+                text.insert(0, Text::raw("Enter - Next      "));
+            }
 
             Paragraph::new(text.iter())
                 .block(Block::default().borders(Borders::ALL))

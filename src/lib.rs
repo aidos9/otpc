@@ -15,6 +15,8 @@ use std::error::Error;
 use std::fs;
 use std::io::{stdin, stdout, Write};
 
+const BASE_32_ALPHABET: &'static str = "abcdefghijklmnopqrstuvwxyz234567";
+
 pub fn run_interactive() {
     interactive::run();
 }
@@ -332,8 +334,6 @@ pub fn run_startup_checks() -> Option<String> {
 }
 
 fn is_base_32(str: &String) -> bool {
-    const BASE_32_ALPHABET: &'static str = "abcdefghijklmnopqrstuvwxyz234567";
-
     for c in str.chars() {
         if !BASE_32_ALPHABET.contains(c) {
             return false;
@@ -343,11 +343,13 @@ fn is_base_32(str: &String) -> bool {
     return true;
 }
 
-fn is_number(str: &String) -> bool {
-    const DIGITS: &'static str = "1234567890";
+fn is_base_32_c(c: char) -> bool {
+    return BASE_32_ALPHABET.contains(c);
+}
 
+fn is_number(str: &String) -> bool {
     for c in str.chars() {
-        if !DIGITS.contains(c) {
+        if !c.is_numeric() {
             return false;
         }
     }
