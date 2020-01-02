@@ -9,13 +9,13 @@ extern crate unicode_width;
 mod interactive;
 mod item;
 mod item_storage;
+mod util;
 use item::{Digits, Item};
 use item_storage::{storage_location, storage_location_exists};
 use std::error::Error;
 use std::fs;
 use std::io::{stdin, stdout, Write};
-
-const BASE_32_ALPHABET: &'static str = "abcdefghijklmnopqrstuvwxyz234567";
+use util::{is_base_32, is_number, contains_item_label};
 
 pub fn run_interactive() {
     interactive::run();
@@ -272,11 +272,9 @@ pub fn run_new() {
     if storage_location_exists() {
         match item_storage::retrieve_items(&storage_location()) {
             Ok(ref mut items) => {
-                for lbl in items.into_iter().map(|item| item.label.clone()) {
-                    if lbl == item.label {
-                        eprintln!("An item with this label already exists.");
-                        std::process::exit(1);
-                    }
+                if contains_item_label(&item.label, &items) {
+                    eprintln!("An item with this label already exists.");
+                    std::process::exit(1);
                 }
 
                 items.push(item);
@@ -331,28 +329,4 @@ pub fn run_startup_checks() -> Option<String> {
         }
         None => return Some(String::from("Could not determine home directory.")),
     }
-}
-
-fn is_base_32(str: &String) -> bool {
-    for c in str.chars() {
-        if !BASE_32_ALPHABET.contains(c) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-fn is_base_32_c(c: char) -> bool {
-    return BASE_32_ALPHABET.contains(c);
-}
-
-fn is_number(str: &String) -> bool {
-    for c in str.chars() {
-        if !c.is_numeric() {
-            return false;
-        }
-    }
-
-    return true;
 }

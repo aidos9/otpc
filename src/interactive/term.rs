@@ -17,7 +17,7 @@ use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, SelectableList, Text, Widget};
 use tui::Terminal;
 use unicode_width::UnicodeWidthStr;
-use crate::is_base_32_c;
+use crate::util::*;
 
 #[derive(PartialEq)]
 enum TermMenu {
@@ -144,6 +144,9 @@ impl Term {
                 self.editing_item_index = None;
                 let _ = self.terminal.show_cursor();
             }
+            TermMenu::Main => {
+                self.selected_index = 0;
+            }
             _ => match self.editing_item_index {
                 Some(n) => {
                     self.selected_index = n;
@@ -191,6 +194,8 @@ impl Term {
         match Term::get_key(receiver)? {
             Some(k) => match k {
                 Key::Char(c) => {
+                    self.reset_changing_fields();
+
                     if !c.is_whitespace() {
                         if self.selected_index == 0 {
                             self.new_item_label
@@ -205,7 +210,7 @@ impl Term {
                                 self.field_cursor_x += 1;
                             }
                         } else if self.selected_index == 2 {
-                            if c.is_numeric() {
+                            if c == '6' || c == '7' || c == '8' {
                                 self.new_item_digits
                                     .get_or_insert(String::new())
                                     .insert(self.field_cursor_x as usize, c);
@@ -220,15 +225,22 @@ impl Term {
                             }
                         }
                     }else if c == '\n' {
+                        self.reset_changing_fields();
+
                         if self.selected_index < 3 {
                             self.selected_index += 1;
                             self.new_item_menu_check_x();
                         }else {
-                            // Add
+                            if self.new_menu_add_item() {
+                                self.save()?;
+                                self.switch_menu(TermMenu::Main);
+                            }
                         }
                     }
                 }
                 Key::Backspace => {
+                    self.reset_changing_fields();
+
                     if self.selected_index == 0 {
                         let str = self.new_item_label.get_or_insert(String::new());
                         if str.len() > 0 && self.field_cursor_x < (str.len() as u16 + 1) {
@@ -256,9 +268,12 @@ impl Term {
                     }
                 }
                 Key::Esc => {
+                    self.reset_changing_fields();
                     self.switch_menu(TermMenu::Main);
                 }
                 Key::Up => {
+                    self.reset_changing_fields();
+
                     if self.selected_index != 0 {
                         self.selected_index -= 1;
                     } else {
@@ -268,6 +283,8 @@ impl Term {
                     self.new_item_menu_check_x();
                 }
                 Key::Down => {
+                    self.reset_changing_fields();
+
                     if self.selected_index == 3 {
                         self.selected_index = 0;
                     } else {
@@ -277,6 +294,8 @@ impl Term {
                     self.new_item_menu_check_x();
                 }
                 Key::Right => {
+                    self.reset_changing_fields();
+
                     if self.selected_index == 0 {
                         match &self.new_item_label {
                             Some(s) => {
@@ -328,6 +347,8 @@ impl Term {
                     }
                 }
                 Key::Left => {
+                    self.reset_changing_fields();
+
                     if self.selected_index == 0 {
                         match &self.new_item_label {
                             Some(s) => {
@@ -425,6 +446,7 @@ impl Term {
         }
 
         let selected_index = self.selected_index;
+        let alternate_footer = &self.alternate_footer;
 
         match self.terminal.draw(|mut f| {
             let root_chunks = Layout::default()
@@ -470,12 +492,18 @@ impl Term {
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[3]);
 
-            let mut text = vec![Text::raw("Esc - Back")];
+            let mut text;
 
-            if selected_index == 3 {
-                text.insert(0, Text::raw("Enter - Add      "));
+            if alternate_footer.is_empty() {
+                text = vec![Text::raw("Esc - Back")];
+
+                if selected_index == 3 {
+                    text.insert(0, Text::raw("Enter - Add      "));
+                }else {
+                    text.insert(0, Text::raw("Enter - Next      "));
+                }
             }else {
-                text.insert(0, Text::raw("Enter - Next      "));
+                text = vec![Text::raw(alternate_footer)];
             }
 
             Paragraph::new(text.iter())
@@ -488,6 +516,116 @@ impl Term {
         }
 
         return Ok(());
+    }
+
+    fn new_menu_add_item(&mut self) -> bool {
+        let label: String;
+        let secret: String;
+        let digits: Digits;
+        let period: u32;
+
+        // Check that all fields have been filled out with valid types.
+        match &self.new_item_label {
+            Some(s) => {
+                if s.is_empty() {
+                    self.alternate_footer = String::from("A label is required.");
+                    return false;
+                }
+
+                if contains_white_space(&String::from(s.trim())) {
+                    self.alternate_footer = String::from("No whitespace is permitted in the label.");
+                    return false;
+                }
+
+                label = s.clone();
+            },
+            None => {
+                self.alternate_footer = String::from("A label is required.");
+                return false;
+            }
+        }
+
+        match &self.new_item_secret {
+            Some(s) => {
+                if s.is_empty() {
+                    self.alternate_footer = String::from("A valid base-32 secret is required.");
+                    return false;
+                }
+
+                if !is_base_32(s) {
+                    self.alternate_footer = String::from("A valid base-32 secret is required.");
+                    return false;
+                }
+
+                secret = s.clone();
+            },
+            None => {
+                self.alternate_footer = String::from("A valid base-32 secret is required.");
+                return false;
+            }
+        }
+
+        match &self.new_item_digits {
+            Some(s) => {
+                if s.is_empty() {
+                    self.alternate_footer = String::from("A valid number of digits is required.");
+                    return false;
+                }
+
+                if s == "6" {
+                    digits = Digits::Six;
+                }else if s == "7" {
+                    digits = Digits::Seven;
+                }else if s == "8" {
+                    digits = Digits::Eight;
+                }else {
+                    self.alternate_footer = String::from("A valid number of digits is required.");
+                    return false;
+                }
+            },
+            None => {
+                self.alternate_footer = String::from("A valid number of digits is required.");
+                return false;
+            }
+        }
+
+        match &self.new_item_period {
+            Some(s) => {
+                if s.is_empty() {
+                    self.alternate_footer = String::from("A valid period is required.");
+                    return false;
+                }
+
+                if !is_number(&s) {
+                    self.alternate_footer = String::from("A valid period is required.");
+                    return false;
+                }
+
+                match s.parse::<u32>() {
+                    Ok(n) => period = n,
+                    Err(_) => {
+                        self.alternate_footer = String::from("A valid period is required.");
+                        return false;
+                    }
+                }
+
+                if period == 0 {
+                    self.alternate_footer = String::from("A valid period greater than 0 is required.");
+                    return false;
+                }
+            },
+            None => {
+                self.alternate_footer = String::from("A valid period is required.");
+                return false;
+            }
+        }
+
+        self.items.push(Item {label,
+            secret,
+            digits,
+            split_time: period });
+
+        return true;
     }
 
     fn new_item_menu_check_x(&mut self) {
