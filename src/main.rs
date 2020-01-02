@@ -37,7 +37,8 @@ fn main() {
                 .help("Get the current code of an item")
                 .takes_value(true)
                 .value_name("LABEL"),
-        ).get_matches();
+        )
+        .get_matches();
 
     match otpc::run_startup_checks() {
         Some(s) => {

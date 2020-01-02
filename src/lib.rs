@@ -1,13 +1,15 @@
+extern crate clipboard;
 extern crate dirs;
 extern crate lotp;
 extern crate serde;
 extern crate serde_json;
 extern crate termion;
 extern crate tui;
-extern crate clipboard;
+extern crate unicode_width;
 mod interactive;
 mod item;
 mod item_storage;
+use item::{Digits, Item};
 use item_storage::{storage_location, storage_location_exists};
 use std::error::Error;
 use std::fs;
@@ -239,14 +241,13 @@ pub fn run_new() {
         }
     }
 
-    let digits_num: u8;
-
-    match digits.parse::<u8>() {
-        Ok(d) => digits_num = d,
-        Err(_) => {
-            eprintln!("Could not convert the supplied number of digits into a number.");
-            std::process::exit(1);
-        }
+    let digits_enum: Digits;
+    if digits == "8" || digits == "eight" {
+        digits_enum = Digits::Eight;
+    } else if digits == "7" || digits == "seven" {
+        digits_enum = Digits::Seven;
+    } else {
+        digits_enum = Digits::Six;
     }
 
     let period_num: u32;
@@ -259,10 +260,10 @@ pub fn run_new() {
         }
     }
 
-    let item = item::Item {
+    let item = Item {
         label,
         secret,
-        digits: digits_num,
+        digits: digits_enum,
         split_time: period_num,
     };
 
