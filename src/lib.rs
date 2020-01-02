@@ -15,7 +15,7 @@ use item_storage::{storage_location, storage_location_exists};
 use std::error::Error;
 use std::fs;
 use std::io::{stdin, stdout, Write};
-use util::{is_base_32, is_number, contains_item_label};
+use util::{contains_item_label, is_base_32, is_number};
 
 pub fn run_interactive() {
     interactive::run();

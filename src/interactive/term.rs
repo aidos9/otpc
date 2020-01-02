@@ -1,5 +1,6 @@
 use crate::item::{Digits, Item};
 use crate::item_storage;
+use crate::util::*;
 use clipboard::{ClipboardContext, ClipboardProvider};
 use std::io::{self, Write};
 use std::sync::mpsc;
@@ -17,7 +18,6 @@ use tui::style::{Color, Modifier, Style};
 use tui::widgets::{Block, Borders, Paragraph, SelectableList, Text, Widget};
 use tui::Terminal;
 use unicode_width::UnicodeWidthStr;
-use crate::util::*;
 
 #[derive(PartialEq)]
 enum TermMenu {
@@ -224,13 +224,13 @@ impl Term {
                                 self.field_cursor_x += 1;
                             }
                         }
-                    }else if c == '\n' {
+                    } else if c == '\n' {
                         self.reset_changing_fields();
 
                         if self.selected_index < 3 {
                             self.selected_index += 1;
                             self.new_item_menu_check_x();
-                        }else {
+                        } else {
                             if self.new_menu_add_item() {
                                 self.save()?;
                                 self.switch_menu(TermMenu::Main);
@@ -480,15 +480,27 @@ impl Term {
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[0]);
             Paragraph::new(secret_input.iter())
-                .block(Block::default().borders(Borders::ALL).title("Secret (Base-32)"))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Secret (Base-32)"),
+                )
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[1]);
             Paragraph::new(digits_input.iter())
-                .block(Block::default().borders(Borders::ALL).title("Digits (6/7/8)"))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Digits (6/7/8)"),
+                )
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[2]);
             Paragraph::new(period_input.iter())
-                .block(Block::default().borders(Borders::ALL).title("Period (seconds)"))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title("Period (seconds)"),
+                )
                 .alignment(Alignment::Left)
                 .render(&mut f, vert_chunks[3]);
 
@@ -499,10 +511,10 @@ impl Term {
 
                 if selected_index == 3 {
                     text.insert(0, Text::raw("Enter - Add      "));
-                }else {
+                } else {
                     text.insert(0, Text::raw("Enter - Next      "));
                 }
-            }else {
+            } else {
                 text = vec![Text::raw(alternate_footer)];
             }
 
@@ -533,12 +545,13 @@ impl Term {
                 }
 
                 if contains_white_space(&String::from(s.trim())) {
-                    self.alternate_footer = String::from("No whitespace is permitted in the label.");
+                    self.alternate_footer =
+                        String::from("No whitespace is permitted in the label.");
                     return false;
                 }
 
                 label = s.clone();
-            },
+            }
             None => {
                 self.alternate_footer = String::from("A label is required.");
                 return false;
@@ -558,7 +571,7 @@ impl Term {
                 }
 
                 secret = s.clone();
-            },
+            }
             None => {
                 self.alternate_footer = String::from("A valid base-32 secret is required.");
                 return false;
@@ -574,15 +587,15 @@ impl Term {
 
                 if s == "6" {
                     digits = Digits::Six;
-                }else if s == "7" {
+                } else if s == "7" {
                     digits = Digits::Seven;
-                }else if s == "8" {
+                } else if s == "8" {
                     digits = Digits::Eight;
-                }else {
+                } else {
                     self.alternate_footer = String::from("A valid number of digits is required.");
                     return false;
                 }
-            },
+            }
             None => {
                 self.alternate_footer = String::from("A valid number of digits is required.");
                 return false;
@@ -610,20 +623,23 @@ impl Term {
                 }
 
                 if period == 0 {
-                    self.alternate_footer = String::from("A valid period greater than 0 is required.");
+                    self.alternate_footer =
+                        String::from("A valid period greater than 0 is required.");
                     return false;
                 }
-            },
+            }
             None => {
                 self.alternate_footer = String::from("A valid period is required.");
                 return false;
             }
         }
 
-        self.items.push(Item {label,
+        self.items.push(Item {
+            label,
             secret,
             digits,
-            split_time: period });
+            split_time: period,
+        });
 
         return true;
     }
