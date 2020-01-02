@@ -550,6 +550,11 @@ impl Term {
                     return false;
                 }
 
+                if contains_item_label(&s, &self.items) {
+                    self.alternate_footer = String::from("An item with this label already exists.");
+                    return false;
+                }
+
                 label = s.clone();
             }
             None => {
