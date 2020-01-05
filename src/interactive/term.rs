@@ -47,6 +47,7 @@ pub struct Term {
     new_item_digits: Option<String>,
     new_item_period: Option<String>,
     field_cursor_x: u16,
+    pending_confirmation: bool,
 }
 
 impl Term {
@@ -97,6 +98,7 @@ impl Term {
             new_item_digits: None,
             new_item_period: None,
             field_cursor_x: 0,
+            pending_confirmation: false,
         };
     }
 

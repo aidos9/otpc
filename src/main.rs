@@ -3,7 +3,7 @@ use clap::{App, Arg};
 extern crate otpc;
 
 fn main() {
-    let matches = App::new("otpc")
+    let mut app = App::new("otpc")
         .about("A Command Line One-Time Password client.")
         .version("0.1.0")
         .arg(
@@ -27,18 +27,22 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("interactive")
-                .short("i")
-                .help("Enter interactive mode"),
-        )
-        .arg(
             Arg::with_name("code")
                 .short("c")
                 .help("Get the current code of an item")
                 .takes_value(true)
                 .value_name("LABEL"),
-        )
-        .get_matches();
+        );
+
+    if cfg!(feature = "interactive") {
+        app = app.arg(
+            Arg::with_name("interactive")
+                .short("i")
+                .help("Enter interactive mode"),
+        );
+    }
+
+    let matches = app.get_matches();
 
     match otpc::run_startup_checks() {
         Some(s) => {
@@ -68,7 +72,10 @@ fn main() {
                 std::process::exit(1);
             }
         }
-    } else if matches.is_present("interactive") {
-        otpc::run_interactive();
+    } else if cfg!(feature = "interactive") {
+        if matches.is_present("interactive") {
+            #[cfg(feature = "interactive")]
+            otpc::run_interactive();
+        }
     }
 }

@@ -1,11 +1,16 @@
+#[cfg(feature = "interactive")]
 extern crate clipboard;
 extern crate dirs;
 extern crate lotp;
 extern crate serde;
 extern crate serde_json;
+#[cfg(feature = "interactive")]
 extern crate termion;
+#[cfg(feature = "interactive")]
 extern crate tui;
+#[cfg(feature = "interactive")]
 extern crate unicode_width;
+#[cfg(feature = "interactive")]
 mod interactive;
 mod item;
 mod item_storage;
@@ -17,6 +22,7 @@ use std::fs;
 use std::io::{stdin, stdout, Write};
 use util::{contains_item_label, is_base_32, is_number};
 
+#[cfg(feature = "interactive")]
 pub fn run_interactive() {
     interactive::run();
 }
