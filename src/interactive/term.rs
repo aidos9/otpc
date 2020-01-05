@@ -700,14 +700,25 @@ impl Term {
         match Term::get_key(receiver)? {
             Some(k) => match k {
                 Key::Char(c) => {
-                    if c == 'q' {
-                        self.quit();
-                    } else if c == 'c' {
-                        self.copy();
-                    } else if c == 'r' {
-                        self.remove();
-                    } else if c == 'n' {
-                        self.switch_menu(TermMenu::New);
+                    if !self.pending_confirmation {
+                        if c == 'q' {
+                            self.quit();
+                        } else if c == 'c' {
+                            self.copy();
+                        } else if c == 'r' {
+                            if self.items.len() > 0 {
+                                self.alternate_footer = String::from("y - Delete      n - Cancel");
+                                self.pending_confirmation = true;
+                            }
+                        } else if c == 'n' {
+                            self.switch_menu(TermMenu::New);
+                        }
+                    }else {
+                        if c == 'y' {
+                            self.remove()?;
+                        }else {
+                            self.reset_changing_fields();
+                        }
                     }
                 }
                 Key::Up => {
@@ -751,6 +762,7 @@ impl Term {
 
         let copy_status = self.copy_status.clone();
         let selected_index = self.selected_index.clone();
+        let alternate_footer = self.alternate_footer.clone();
 
         match self.terminal.draw(|mut f| {
             let chunks = Layout::default()
@@ -772,26 +784,32 @@ impl Term {
                 .highlight_style(style.fg(Color::Magenta).modifier(Modifier::BOLD))
                 .render(&mut f, chunks[0]);
 
-            let copy_text;
-            match copy_status {
-                Status::None => {
-                    copy_text = Text::raw("c - Copy      ");
-                }
-                Status::Success => {
-                    copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Green));
-                }
-                Status::Fail => {
-                    copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Red));
-                }
-            }
+            let text;
 
-            let text = vec![
-                Text::raw("n - New      "),
-                Text::raw("e - Edit      "),
-                copy_text,
-                Text::raw("r - Delete      "),
-                Text::raw("q - Quit"),
-            ];
+            if alternate_footer.is_empty() {
+                let copy_text;
+                match copy_status {
+                    Status::None => {
+                        copy_text = Text::raw("c - Copy      ");
+                    }
+                    Status::Success => {
+                        copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Green));
+                    }
+                    Status::Fail => {
+                        copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Red));
+                    }
+                }
+
+                text = vec![
+                    Text::raw("n - New      "),
+                    Text::raw("e - Edit      "),
+                    copy_text,
+                    Text::raw("r - Delete      "),
+                    Text::raw("q - Quit"),
+                ];
+            }else {
+                text = vec![Text::raw(alternate_footer)];
+            }
 
             Paragraph::new(text.iter())
                 .block(Block::default().borders(Borders::ALL))
@@ -827,17 +845,25 @@ impl Term {
         }
     }
 
-    //TODO: Implement the remove method.
-    fn remove(&mut self) {
-        if self.current_menu == TermMenu::Main {
-        } else {
-            return;
+    fn remove(&mut self) -> Result<(), &'static str> {
+        if self.current_menu == TermMenu::Main && self.selected_index < self.items.len() {
+            self.items.remove(self.selected_index);
+
+            if self.selected_index > 0 {
+                self.selected_index -= 1;
+            }
+
+            self.save()?;
+            self.reset_changing_fields();
         }
+
+        return Ok(());
     }
 
     fn reset_changing_fields(&mut self) {
         self.copy_status = Status::None;
         self.alternate_footer = String::new();
+        self.pending_confirmation = false;
     }
 
     fn quit(&mut self) {
