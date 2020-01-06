@@ -3,6 +3,7 @@ A One-Time Password Client, using the TOTP algorithm.
 
 ## Table of contents
 * [Usage](#Usage)
+* [Installing](#Installing)
 * [Building](#Building)
 
 ## Usage
@@ -12,6 +13,12 @@ To see the available options run:
 ./otpc --help
 ```
 
+## Installing
+The latest version may be installed or updated using:
+```
+cargo install --git https://github.com/aidos9/otpc.git
+```
+
 ## Building
 
 #### Features
@@ -19,16 +26,14 @@ To see the available options run:
 "interactive" - Enable the interactive option. Enabled by default
 ```
 
-#### Compiling and installation
+#### Compiling
 
 OTPC is written in Rust and uses cargo for dependency management and compilation. To build and install run:
 ```
 cargo build --release
-cargo install
 ```
 
 To build without interactive mode:
 ```
 cargo build --release --no-default-features
-cargo install
 ```
