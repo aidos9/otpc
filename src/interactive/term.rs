@@ -42,10 +42,10 @@ pub struct Term {
     copy_status: Status,
     alternate_footer: String,
     editing_item_index: Option<usize>,
-    new_item_label: Option<String>,
-    new_item_secret: Option<String>,
-    new_item_digits: Option<String>,
-    new_item_period: Option<String>,
+    item_label: Option<String>,
+    item_secret: Option<String>,
+    item_digits: Option<String>,
+    item_period: Option<String>,
     field_cursor_x: u16,
     pending_confirmation: bool,
 }
@@ -93,10 +93,10 @@ impl Term {
             copy_status: Status::None,
             alternate_footer: String::new(),
             editing_item_index: None,
-            new_item_label: None,
-            new_item_secret: None,
-            new_item_digits: None,
-            new_item_period: None,
+            item_label: None,
+            item_secret: None,
+            item_digits: None,
+            item_period: None,
             field_cursor_x: 0,
             pending_confirmation: false,
         };
@@ -126,11 +126,11 @@ impl Term {
         self.reset_changing_fields();
 
         match self.current_menu {
-            TermMenu::New => {
-                self.new_item_label = None;
-                self.new_item_secret = None;
-                self.new_item_digits = None;
-                self.new_item_period = None;
+            TermMenu::New | TermMenu::Edit => {
+                self.item_label = None;
+                self.item_secret = None;
+                self.item_digits = None;
+                self.item_period = None;
                 let _ = self.terminal.hide_cursor();
                 self.field_cursor_x = 0;
             }
@@ -140,6 +140,17 @@ impl Term {
         match new_menu {
             TermMenu::Edit => {
                 self.editing_item_index = Some(self.selected_index);
+                self.item_label = Some(self.items[self.selected_index].label.clone());
+                self.item_secret = Some(self.items[self.selected_index].secret.clone());
+                self.item_digits = match self.items[self.selected_index].digits {
+                    Digits::Eight => Some(String::from("8")),
+                    Digits::Seven => Some(String::from("7")),
+                    Digits::Six => Some(String::from("6")),
+                };
+                self.item_period = Some(format!("{}", self.items[self.selected_index].split_time));
+
+                self.selected_index = 0;
+                let _ = self.terminal.show_cursor();
             }
             TermMenu::New => {
                 self.selected_index = 0;
@@ -168,15 +179,13 @@ impl Term {
         match &self.current_menu {
             TermMenu::Main => return self.main_menu(rec),
             TermMenu::New => return self.new_menu(rec),
+            TermMenu::Edit => return self.edit_menu(rec),
             _ => return self.draw_main_menu(),
         }
     }
 
-    fn new_menu(
-        &mut self,
-        receiver: &Receiver<Result<termion::event::Key, std::io::Error>>,
-    ) -> Result<(), &'static str> {
-        self.draw_new_menu()?;
+    fn edit_menu(&mut self, receiver: &Receiver<Result<termion::event::Key, std::io::Error>>) -> Result<(), &'static str> {
+        self.draw_edit_menu("Enter - Save      ", "Edit")?;
         // Put the cursor back inside the input box
         match write!(
             self.terminal.backend_mut(),
@@ -193,6 +202,34 @@ impl Term {
         // stdout is buffered, flush it to see the effect immediately.
         io::stdout().flush().ok();
 
+        return self.handle_edit_input(receiver);
+    }
+
+    fn new_menu(
+        &mut self,
+        receiver: &Receiver<Result<termion::event::Key, std::io::Error>>,
+    ) -> Result<(), &'static str> {
+        self.draw_edit_menu("Enter - Add      ", "New")?;
+        // Put the cursor back inside the input box
+        match write!(
+            self.terminal.backend_mut(),
+            "{}",
+            Goto(
+                4 + self.field_cursor_x,
+                1 + (3 * (self.selected_index as u16 + 1))
+            )
+        ) {
+            Ok(_) => (),
+            Err(_) => return Err("Could not write to stdout."),
+        }
+
+        // stdout is buffered, flush it to see the effect immediately.
+        io::stdout().flush().ok();
+
+        return self.handle_edit_input(receiver);
+    }
+
+    fn handle_edit_input(&mut self, receiver: &Receiver<Result<termion::event::Key, std::io::Error>>)  -> Result<(), &'static str> {
         match Term::get_key(receiver)? {
             Some(k) => match k {
                 Key::Char(c) => {
@@ -200,27 +237,27 @@ impl Term {
 
                     if !c.is_whitespace() {
                         if self.selected_index == 0 {
-                            self.new_item_label
+                            self.item_label
                                 .get_or_insert(String::new())
                                 .insert(self.field_cursor_x as usize, c);
                             self.field_cursor_x += 1;
                         } else if self.selected_index == 1 {
                             if is_base_32_c(c) {
-                                self.new_item_secret
+                                self.item_secret
                                     .get_or_insert(String::new())
                                     .insert(self.field_cursor_x as usize, c);
                                 self.field_cursor_x += 1;
                             }
                         } else if self.selected_index == 2 {
                             if c == '6' || c == '7' || c == '8' {
-                                self.new_item_digits
+                                self.item_digits
                                     .get_or_insert(String::new())
                                     .insert(self.field_cursor_x as usize, c);
                                 self.field_cursor_x += 1;
                             }
                         } else if self.selected_index == 3 {
                             if c.is_numeric() {
-                                self.new_item_period
+                                self.item_period
                                     .get_or_insert(String::new())
                                     .insert(self.field_cursor_x as usize, c);
                                 self.field_cursor_x += 1;
@@ -231,11 +268,18 @@ impl Term {
 
                         if self.selected_index < 3 {
                             self.selected_index += 1;
-                            self.new_item_menu_check_x();
+                            self.item_menu_check_x();
                         } else {
-                            if self.new_menu_add_item() {
-                                self.save()?;
-                                self.switch_menu(TermMenu::Main);
+                            if self.current_menu == TermMenu::New {
+                                if self.new_menu_add_item() {
+                                    self.save()?;
+                                    self.switch_menu(TermMenu::Main);
+                                }
+                            }else if self.current_menu == TermMenu::Edit {
+                                if self.edit_menu_save_item() {
+                                    self.save()?;
+                                    self.switch_menu(TermMenu::Main);
+                                }
                             }
                         }
                     }
@@ -244,25 +288,25 @@ impl Term {
                     self.reset_changing_fields();
 
                     if self.selected_index == 0 {
-                        let str = self.new_item_label.get_or_insert(String::new());
+                        let str = self.item_label.get_or_insert(String::new());
                         if str.len() > 0 && self.field_cursor_x < (str.len() as u16 + 1) {
                             str.remove((self.field_cursor_x as usize) - 1);
                             self.field_cursor_x -= 1;
                         }
                     } else if self.selected_index == 1 {
-                        let str = self.new_item_secret.get_or_insert(String::new());
+                        let str = self.item_secret.get_or_insert(String::new());
                         if str.len() > 0 && self.field_cursor_x < (str.len() as u16 + 1) {
                             str.remove((self.field_cursor_x as usize) - 1);
                             self.field_cursor_x -= 1;
                         }
                     } else if self.selected_index == 2 {
-                        let str = self.new_item_digits.get_or_insert(String::new());
+                        let str = self.item_digits.get_or_insert(String::new());
                         if str.len() > 0 && self.field_cursor_x < (str.len() as u16 + 1) {
                             str.remove((self.field_cursor_x as usize) - 1);
                             self.field_cursor_x -= 1;
                         }
                     } else if self.selected_index == 3 {
-                        let str = self.new_item_period.get_or_insert(String::new());
+                        let str = self.item_period.get_or_insert(String::new());
                         if str.len() > 0 && self.field_cursor_x < (str.len() as u16 + 1) {
                             str.remove((self.field_cursor_x as usize) - 1);
                             self.field_cursor_x -= 1;
@@ -282,7 +326,7 @@ impl Term {
                         self.selected_index = 3;
                     }
 
-                    self.new_item_menu_check_x();
+                    self.item_menu_check_x();
                 }
                 Key::Down => {
                     self.reset_changing_fields();
@@ -293,13 +337,13 @@ impl Term {
                         self.selected_index += 1;
                     }
 
-                    self.new_item_menu_check_x();
+                    self.item_menu_check_x();
                 }
                 Key::Right => {
                     self.reset_changing_fields();
 
                     if self.selected_index == 0 {
-                        match &self.new_item_label {
+                        match &self.item_label {
                             Some(s) => {
                                 // <= because we want the cursor to sit one cell past the last character
                                 if self.field_cursor_x + 1 <= s.width() as u16 {
@@ -311,7 +355,7 @@ impl Term {
                             None => self.field_cursor_x = 0,
                         }
                     } else if self.selected_index == 1 {
-                        match &self.new_item_secret {
+                        match &self.item_secret {
                             Some(s) => {
                                 // <= because we want the cursor to sit one cell past the last character
                                 if self.field_cursor_x + 1 <= s.width() as u16 {
@@ -323,7 +367,7 @@ impl Term {
                             None => self.field_cursor_x = 0,
                         }
                     } else if self.selected_index == 2 {
-                        match &self.new_item_digits {
+                        match &self.item_digits {
                             Some(s) => {
                                 // <= because we want the cursor to sit one cell past the last character
                                 if self.field_cursor_x + 1 <= s.width() as u16 {
@@ -335,7 +379,7 @@ impl Term {
                             None => self.field_cursor_x = 0,
                         }
                     } else if self.selected_index == 3 {
-                        match &self.new_item_period {
+                        match &self.item_period {
                             Some(s) => {
                                 // <= because we want the cursor to sit one cell past the last character
                                 if self.field_cursor_x + 1 <= s.width() as u16 {
@@ -352,7 +396,7 @@ impl Term {
                     self.reset_changing_fields();
 
                     if self.selected_index == 0 {
-                        match &self.new_item_label {
+                        match &self.item_label {
                             Some(s) => {
                                 // Check if greater than 1 because any subtraction to field_cursor_x will cause integer overflow.
                                 if self.field_cursor_x > 1 {
@@ -364,7 +408,7 @@ impl Term {
                             None => self.field_cursor_x = 0,
                         }
                     } else if self.selected_index == 1 {
-                        match &self.new_item_secret {
+                        match &self.item_secret {
                             Some(s) => {
                                 // Check if greater than 1 because any subtraction to field_cursor_x will cause integer overflow.
                                 if self.field_cursor_x > 1 {
@@ -376,7 +420,7 @@ impl Term {
                             None => self.field_cursor_x = 0,
                         }
                     } else if self.selected_index == 2 {
-                        match &self.new_item_digits {
+                        match &self.item_digits {
                             Some(s) => {
                                 // Check if greater than 1 because any subtraction to field_cursor_x will cause integer overflow.
                                 if self.field_cursor_x > 1 {
@@ -388,7 +432,7 @@ impl Term {
                             None => self.field_cursor_x = 0,
                         }
                     } else if self.selected_index == 3 {
-                        match &self.new_item_period {
+                        match &self.item_period {
                             Some(s) => {
                                 // Check if greater than 1 because any subtraction to field_cursor_x will cause integer overflow.
                                 if self.field_cursor_x > 1 {
@@ -409,41 +453,41 @@ impl Term {
         return Ok(());
     }
 
-    fn draw_new_menu(&mut self) -> Result<(), &'static str> {
+    fn draw_edit_menu(&mut self, completion_text: &'static str, title: &'static str) -> Result<(), &'static str> {
         let label_input;
 
-        match self.new_item_label {
+        match self.item_label {
             Some(ref s) => label_input = vec![Text::raw(s)],
             None => {
                 label_input = vec![Text::raw(String::new())];
-                self.new_item_label = Some(String::new());
+                self.item_label = Some(String::new());
             }
         }
 
         let secret_input;
-        match self.new_item_secret {
+        match self.item_secret {
             Some(ref s) => secret_input = vec![Text::raw(s)],
             None => {
                 secret_input = vec![Text::raw(String::new())];
-                self.new_item_secret = Some(String::new());
+                self.item_secret = Some(String::new());
             }
         }
 
         let digits_input;
-        match self.new_item_digits {
+        match self.item_digits {
             Some(ref s) => digits_input = vec![Text::raw(s)],
             None => {
                 digits_input = vec![Text::raw(String::new())];
-                self.new_item_digits = Some(String::new());
+                self.item_digits = Some(String::new());
             }
         }
 
         let period_input;
-        match self.new_item_period {
+        match self.item_period {
             Some(ref s) => period_input = vec![Text::raw(s)],
             None => {
                 period_input = vec![Text::raw(String::new())];
-                self.new_item_period = Some(String::new());
+                self.item_period = Some(String::new());
             }
         }
 
@@ -459,7 +503,7 @@ impl Term {
             // Wrapping block.
             Block::default()
                 .borders(Borders::ALL)
-                .title("New")
+                .title(title)
                 .render(&mut f, root_chunks[0]);
 
             let vert_chunks = Layout::default()
@@ -512,7 +556,7 @@ impl Term {
                 text = vec![Text::raw("Esc - Back")];
 
                 if selected_index == 3 {
-                    text.insert(0, Text::raw("Enter - Add      "));
+                    text.insert(0, Text::raw(completion_text));
                 } else {
                     text.insert(0, Text::raw("Enter - Next      "));
                 }
@@ -526,70 +570,101 @@ impl Term {
                 .render(&mut f, root_chunks[1]);
         }) {
             Ok(_) => (),
-            Err(_) => return Err("Could not draw the new item menu"),
+            Err(_) => return Err("Could not draw the edit item menu"),
         }
 
         return Ok(());
     }
 
+    fn edit_menu_save_item(&mut self) -> bool {
+        match self.item_menu_construct_item(true) {
+            Ok(item) => {
+                match self.editing_item_index {
+                    Some(index) => {
+                        if index >= self.items.len() {
+                            self.alternate_footer = String::from("Internal error obtaining the correct item.");
+                            return false;
+                        }else {
+                            self.items[index] = item;
+                            return true;
+                        }
+                    },
+                    None => {
+                        self.alternate_footer = String::from("Internal error determining the correct item.");
+                        return false;
+                    }
+                }
+            },
+            Err(str) => {
+                self.alternate_footer = str;
+                return false;
+            }
+        }
+    }
+
     fn new_menu_add_item(&mut self) -> bool {
+        match self.item_menu_construct_item(false) {
+            Ok(item) => self.items.push(item),
+            Err(str) => {
+                self.alternate_footer = str;
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    fn item_menu_construct_item(&mut self, allow_same_name: bool) -> Result<Item, String> {
         let label: String;
         let secret: String;
         let digits: Digits;
         let period: u32;
 
         // Check that all fields have been filled out with valid types.
-        match &self.new_item_label {
+        match &self.item_label {
             Some(s) => {
                 if s.is_empty() {
-                    self.alternate_footer = String::from("A label is required.");
-                    return false;
+                    return Err(String::from("A label is required."));
                 }
 
                 if contains_white_space(&String::from(s.trim())) {
-                    self.alternate_footer =
-                        String::from("No whitespace is permitted in the label.");
-                    return false;
+                    return Err(String::from("No whitespace is permitted in the label."));
                 }
 
-                if contains_item_label(&s, &self.items) {
-                    self.alternate_footer = String::from("An item with this label already exists.");
-                    return false;
+                if !allow_same_name {
+                    if contains_item_label(&s, &self.items) {
+                        return Err(String::from("An item with this label already exists."));
+                    }
                 }
 
                 label = s.clone();
             }
             None => {
-                self.alternate_footer = String::from("A label is required.");
-                return false;
+                return Err(String::from("A label is required."));
             }
         }
 
-        match &self.new_item_secret {
+        match &self.item_secret {
             Some(s) => {
                 if s.is_empty() {
-                    self.alternate_footer = String::from("A valid base-32 secret is required.");
-                    return false;
+                    return Err(String::from("A valid base-32 secret is required."));
                 }
 
                 if !is_base_32(s) {
-                    self.alternate_footer = String::from("A valid base-32 secret is required.");
-                    return false;
+                    return Err(String::from("A valid base-32 secret is required."));
                 }
 
                 secret = s.clone();
             }
             None => {
-                self.alternate_footer = String::from("A valid base-32 secret is required.");
-                return false;
+                return Err(String::from("A valid base-32 secret is required."));
             }
         }
 
-        match &self.new_item_digits {
+        match &self.item_digits {
             Some(s) => {
                 if s.is_empty() {
-                    self.alternate_footer = String::from("A valid number of digits is required.");
-                    return false;
+                    return Err(String::from("A valid number of digits is required."));
                 }
 
                 if s == "6" {
@@ -599,61 +674,51 @@ impl Term {
                 } else if s == "8" {
                     digits = Digits::Eight;
                 } else {
-                    self.alternate_footer = String::from("A valid number of digits is required.");
-                    return false;
+                    return Err(String::from("A valid number of digits is required."));
                 }
             }
             None => {
-                self.alternate_footer = String::from("A valid number of digits is required.");
-                return false;
+                return Err(String::from("A valid number of digits is required."));
             }
         }
 
-        match &self.new_item_period {
+        match &self.item_period {
             Some(s) => {
                 if s.is_empty() {
-                    self.alternate_footer = String::from("A valid period is required.");
-                    return false;
+                    return Err(String::from("A valid period is required."));
                 }
 
                 if !is_number(&s) {
-                    self.alternate_footer = String::from("A valid period is required.");
-                    return false;
+                    return Err(String::from("A valid period is required."));
                 }
 
                 match s.parse::<u32>() {
                     Ok(n) => period = n,
                     Err(_) => {
-                        self.alternate_footer = String::from("A valid period is required.");
-                        return false;
+                        return Err(String::from("A valid period is required."));
                     }
                 }
 
                 if period == 0 {
-                    self.alternate_footer =
-                        String::from("A valid period greater than 0 is required.");
-                    return false;
+                    return Err(String::from("A valid period greater than 0 is required."));
                 }
             }
             None => {
-                self.alternate_footer = String::from("A valid period is required.");
-                return false;
+                return Err(String::from("A valid period is required."));
             }
         }
 
-        self.items.push(Item {
+        return Ok(Item {
             label,
             secret,
             digits,
             split_time: period,
         });
-
-        return true;
     }
 
-    fn new_item_menu_check_x(&mut self) {
+    fn item_menu_check_x(&mut self) {
         if self.selected_index == 0 {
-            match &self.new_item_label {
+            match &self.item_label {
                 Some(s) => {
                     if self.field_cursor_x > s.width() as u16 {
                         self.field_cursor_x = s.width() as u16;
@@ -662,7 +727,7 @@ impl Term {
                 None => self.field_cursor_x = 0,
             }
         } else if self.selected_index == 1 {
-            match &self.new_item_secret {
+            match &self.item_secret {
                 Some(s) => {
                     if self.field_cursor_x > s.width() as u16 {
                         self.field_cursor_x = s.width() as u16;
@@ -671,7 +736,7 @@ impl Term {
                 None => self.field_cursor_x = 0,
             }
         } else if self.selected_index == 2 {
-            match &self.new_item_digits {
+            match &self.item_digits {
                 Some(s) => {
                     if self.field_cursor_x > s.width() as u16 {
                         self.field_cursor_x = s.width() as u16;
@@ -680,7 +745,7 @@ impl Term {
                 None => self.field_cursor_x = 0,
             }
         } else if self.selected_index == 3 {
-            match &self.new_item_period {
+            match &self.item_period {
                 Some(s) => {
                     if self.field_cursor_x > s.width() as u16 {
                         self.field_cursor_x = s.width() as u16;
@@ -712,6 +777,8 @@ impl Term {
                             }
                         } else if c == 'n' {
                             self.switch_menu(TermMenu::New);
+                        }else if c == 'e' {
+                            self.switch_menu(TermMenu::Edit);
                         }
                     }else {
                         if c == 'y' {
