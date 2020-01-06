@@ -7,7 +7,7 @@ A One-Time Password Client, using the TOTP algorithm.
 * [Building](#Building)
 
 ## Usage
-In OTPC each item is tracked through its label, and can be created, viewed, or edited from the command line but it may be easier to use the interactive mode which displays a UI using tui(curses).
+In OTPC each item is tracked through its label, and can be created, viewed, or edited from the command line but it may be easier to use the interactive mode which displays a UI using <a href=https://crates.io/crates/tui>tui</a>(curses).
 To see the available options run:
 ```
 ./otpc --help
