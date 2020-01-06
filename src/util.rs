@@ -106,17 +106,20 @@ mod test {
     pub fn test_contains_item_label() {
         use super::*;
         use crate::Digits;
-        let items = vec![Item{
-            label: String::from("test1"),
-            secret: String::from("test"),
-            digits: Digits::Six,
-            split_time: 30,
-        },Item{
-            label: String::from("test2"),
-            secret: String::from("test2"),
-            digits: Digits::Six,
-            split_time: 30,
-        }];
+        let items = vec![
+            Item {
+                label: String::from("test1"),
+                secret: String::from("test"),
+                digits: Digits::Six,
+                split_time: 30,
+            },
+            Item {
+                label: String::from("test2"),
+                secret: String::from("test2"),
+                digits: Digits::Six,
+                split_time: 30,
+            },
+        ];
 
         assert!(contains_item_label(&String::from("test1"), &items));
     }
@@ -125,17 +128,20 @@ mod test {
     pub fn test_contains_item_label_fail() {
         use super::*;
         use crate::Digits;
-        let items = vec![Item{
-            label: String::from("test1"),
-            secret: String::from("test"),
-            digits: Digits::Six,
-            split_time: 30,
-        },Item{
-            label: String::from("test2"),
-            secret: String::from("test2"),
-            digits: Digits::Six,
-            split_time: 30,
-        }];
+        let items = vec![
+            Item {
+                label: String::from("test1"),
+                secret: String::from("test"),
+                digits: Digits::Six,
+                split_time: 30,
+            },
+            Item {
+                label: String::from("test2"),
+                secret: String::from("test2"),
+                digits: Digits::Six,
+                split_time: 30,
+            },
+        ];
 
         assert!(!contains_item_label(&String::from("test3"), &items));
     }

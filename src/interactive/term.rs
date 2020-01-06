@@ -507,7 +507,7 @@ impl Term {
         match self.terminal.draw(|mut f| {
             let root_chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(93), Constraint::Percentage(7)].as_ref())
+                .constraints([Constraint::Max(100), Constraint::Length(3)].as_ref())
                 .split(f.size());
 
             // Wrapping block.
@@ -844,7 +844,7 @@ impl Term {
         match self.terminal.draw(|mut f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(93), Constraint::Percentage(7)].as_ref())
+                .constraints([Constraint::Max(100), Constraint::Length(3)].as_ref())
                 .split(f.size());
 
             let style = Style::default();
