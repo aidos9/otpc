@@ -48,7 +48,7 @@ fn main() {
 
     let matches = app.get_matches();
 
-    match otpc::run_startup_checks() {
+    match otpc::modes::run_startup_checks() {
         Some(s) => {
             println!("{}", s);
             std::process::exit(1);
@@ -57,14 +57,14 @@ fn main() {
     }
 
     if matches.is_present("new") {
-        otpc::run_new();
+        otpc::modes::run_new();
         return;
     } else if matches.is_present("list") {
-        otpc::run_list();
+        otpc::modes::run_list();
         return;
     } else if matches.is_present("remove") {
         match matches.value_of("remove") {
-            Some(label) => otpc::run_remove(&String::from(label)),
+            Some(label) => otpc::modes::run_remove(&String::from(label)),
             None => {
                 eprintln!("A value is required to remove an item.");
                 std::process::exit(1);
@@ -74,7 +74,7 @@ fn main() {
         return;
     } else if matches.is_present("code") {
         match matches.value_of("code") {
-            Some(label) => otpc::run_display_code(&String::from(label)),
+            Some(label) => otpc::modes::run_display_code(&String::from(label)),
             None => {
                 eprintln!("A value is required to show the code of an item.");
                 std::process::exit(1);
@@ -85,7 +85,7 @@ fn main() {
     } else if cfg!(feature = "interactive") {
         if matches.is_present("interactive") {
             #[cfg(feature = "interactive")]
-            otpc::run_interactive();
+            otpc::modes::run_interactive();
         }
 
         return;
