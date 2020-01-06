@@ -119,7 +119,6 @@ pub fn run_list() {
 pub fn run_new() {
     let mut label = String::new();
 
-    println!();
     while label.is_empty() {
         label = String::new();
         print!("Label: ");
