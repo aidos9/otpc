@@ -184,7 +184,10 @@ impl Term {
         }
     }
 
-    fn edit_menu(&mut self, receiver: &Receiver<Result<termion::event::Key, std::io::Error>>) -> Result<(), &'static str> {
+    fn edit_menu(
+        &mut self,
+        receiver: &Receiver<Result<termion::event::Key, std::io::Error>>,
+    ) -> Result<(), &'static str> {
         self.draw_edit_menu("Enter - Save      ", "Edit")?;
         // Put the cursor back inside the input box
         match write!(
@@ -229,7 +232,10 @@ impl Term {
         return self.handle_edit_input(receiver);
     }
 
-    fn handle_edit_input(&mut self, receiver: &Receiver<Result<termion::event::Key, std::io::Error>>)  -> Result<(), &'static str> {
+    fn handle_edit_input(
+        &mut self,
+        receiver: &Receiver<Result<termion::event::Key, std::io::Error>>,
+    ) -> Result<(), &'static str> {
         match Term::get_key(receiver)? {
             Some(k) => match k {
                 Key::Char(c) => {
@@ -275,7 +281,7 @@ impl Term {
                                     self.save()?;
                                     self.switch_menu(TermMenu::Main);
                                 }
-                            }else if self.current_menu == TermMenu::Edit {
+                            } else if self.current_menu == TermMenu::Edit {
                                 if self.edit_menu_save_item() {
                                     self.save()?;
                                     self.switch_menu(TermMenu::Main);
@@ -453,7 +459,11 @@ impl Term {
         return Ok(());
     }
 
-    fn draw_edit_menu(&mut self, completion_text: &'static str, title: &'static str) -> Result<(), &'static str> {
+    fn draw_edit_menu(
+        &mut self,
+        completion_text: &'static str,
+        title: &'static str,
+    ) -> Result<(), &'static str> {
         let label_input;
 
         match self.item_label {
@@ -578,21 +588,21 @@ impl Term {
 
     fn edit_menu_save_item(&mut self) -> bool {
         match self.item_menu_construct_item(true) {
-            Ok(item) => {
-                match self.editing_item_index {
-                    Some(index) => {
-                        if index >= self.items.len() {
-                            self.alternate_footer = String::from("Internal error obtaining the correct item.");
-                            return false;
-                        }else {
-                            self.items[index] = item;
-                            return true;
-                        }
-                    },
-                    None => {
-                        self.alternate_footer = String::from("Internal error determining the correct item.");
+            Ok(item) => match self.editing_item_index {
+                Some(index) => {
+                    if index >= self.items.len() {
+                        self.alternate_footer =
+                            String::from("Internal error obtaining the correct item.");
                         return false;
+                    } else {
+                        self.items[index] = item;
+                        return true;
                     }
+                }
+                None => {
+                    self.alternate_footer =
+                        String::from("Internal error determining the correct item.");
+                    return false;
                 }
             },
             Err(str) => {
@@ -777,13 +787,13 @@ impl Term {
                             }
                         } else if c == 'n' {
                             self.switch_menu(TermMenu::New);
-                        }else if c == 'e' {
+                        } else if c == 'e' {
                             self.switch_menu(TermMenu::Edit);
                         }
-                    }else {
+                    } else {
                         if c == 'y' {
                             self.remove()?;
-                        }else {
+                        } else {
                             self.reset_changing_fields();
                         }
                     }
@@ -860,7 +870,8 @@ impl Term {
                         copy_text = Text::raw("c - Copy      ");
                     }
                     Status::Success => {
-                        copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Green));
+                        copy_text =
+                            Text::styled("c - Copy      ", Style::default().fg(Color::Green));
                     }
                     Status::Fail => {
                         copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Red));
@@ -874,7 +885,7 @@ impl Term {
                     Text::raw("r - Delete      "),
                     Text::raw("q - Quit"),
                 ];
-            }else {
+            } else {
                 text = vec![Text::raw(alternate_footer)];
             }
 

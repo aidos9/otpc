@@ -1,11 +1,13 @@
+#[macro_use]
 extern crate clap;
-use clap::{App, Arg};
+use clap::{App, AppSettings, Arg};
 extern crate otpc;
 
 fn main() {
     let mut app = App::new("otpc")
+        .setting(AppSettings::ArgRequiredElseHelp)
         .about("A Command Line One-Time Password client.")
-        .version("0.1.0")
+        .version(crate_version!())
         .arg(
             Arg::with_name("new")
                 .short("n")
@@ -29,6 +31,7 @@ fn main() {
         .arg(
             Arg::with_name("code")
                 .short("c")
+                .long("code")
                 .help("Get the current code of an item")
                 .takes_value(true)
                 .value_name("LABEL"),
@@ -38,6 +41,7 @@ fn main() {
         app = app.arg(
             Arg::with_name("interactive")
                 .short("i")
+                .long("interactive")
                 .help("Enter interactive mode"),
         );
     }
@@ -54,8 +58,10 @@ fn main() {
 
     if matches.is_present("new") {
         otpc::run_new();
+        return;
     } else if matches.is_present("list") {
         otpc::run_list();
+        return;
     } else if matches.is_present("remove") {
         match matches.value_of("remove") {
             Some(label) => otpc::run_remove(&String::from(label)),
@@ -64,6 +70,8 @@ fn main() {
                 std::process::exit(1);
             }
         }
+
+        return;
     } else if matches.is_present("code") {
         match matches.value_of("code") {
             Some(label) => otpc::run_display_code(&String::from(label)),
@@ -72,10 +80,14 @@ fn main() {
                 std::process::exit(1);
             }
         }
+
+        return;
     } else if cfg!(feature = "interactive") {
         if matches.is_present("interactive") {
             #[cfg(feature = "interactive")]
             otpc::run_interactive();
         }
+
+        return;
     }
 }
