@@ -105,7 +105,7 @@ mod test {
     #[test]
     pub fn test_contains_item_label() {
         use super::*;
-        use crate::Digits;
+        use crate::item::Digits;
         let items = vec![
             Item {
                 label: String::from("test1"),
@@ -127,7 +127,7 @@ mod test {
     #[test]
     pub fn test_contains_item_label_fail() {
         use super::*;
-        use crate::Digits;
+        use crate::item::Digits;
         let items = vec![
             Item {
                 label: String::from("test1"),
