@@ -1,22 +1,22 @@
 [package]
 name = "otpc"
-version = "0.1.0"
+version = "2.0.0-b1"
 authors = ["aidos9 <20310468+aidos9@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["interactive"]
 
-interactive = ["tui", "termion", "tui", "clipboard", "unicode-width"]
+interactive = ["tui", "termion", "tui", "arboard", "unicode-width"]
 
 [dependencies]
 lotp = { git = "https://github.com/aidos9/lotp" }
-clap = "2.33"
+clap = "3.1"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-dirs = "2.0"
+dirs = "4.0"
 
-tui = { version = "0.8", optional = true }
+tui = { version = "0.18", default-features = false, optional = true, features = ["termion"] }
 termion = { version = "1.5", optional = true }
-clipboard = { version = "0.5", optional = true }
+arboard = { version = "2.1", optional = true }
 unicode-width = { version = "0.1", optional = true}

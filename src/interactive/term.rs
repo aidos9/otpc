@@ -1,7 +1,7 @@
 use crate::item::{Digits, Item};
 use crate::item_storage;
 use crate::util::*;
-use clipboard::{ClipboardContext, ClipboardProvider};
+use arboard::Clipboard;
 use std::io::{self, Write};
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
@@ -15,7 +15,8 @@ use termion::raw::{IntoRawMode, RawTerminal};
 use tui::backend::TermionBackend;
 use tui::layout::{Alignment, Constraint, Direction, Layout};
 use tui::style::{Color, Modifier, Style};
-use tui::widgets::{Block, Borders, Paragraph, SelectableList, Text, Widget};
+use tui::text::{Span, Spans};
+use tui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
 use tui::Terminal;
 use unicode_width::UnicodeWidthStr;
 
@@ -467,36 +468,36 @@ impl Term {
         let label_input;
 
         match self.item_label {
-            Some(ref s) => label_input = vec![Text::raw(s)],
+            Some(ref s) => label_input = Spans::from(vec![Span::raw(s)]),
             None => {
-                label_input = vec![Text::raw(String::new())];
+                label_input = Spans::from(vec![Span::raw(String::new())]);
                 self.item_label = Some(String::new());
             }
         }
 
         let secret_input;
         match self.item_secret {
-            Some(ref s) => secret_input = vec![Text::raw(s)],
+            Some(ref s) => secret_input = Spans::from(vec![Span::raw(s)]),
             None => {
-                secret_input = vec![Text::raw(String::new())];
+                secret_input = Spans::from(vec![Span::raw(String::new())]);
                 self.item_secret = Some(String::new());
             }
         }
 
         let digits_input;
         match self.item_digits {
-            Some(ref s) => digits_input = vec![Text::raw(s)],
+            Some(ref s) => digits_input = Spans::from(vec![Span::raw(s)]),
             None => {
-                digits_input = vec![Text::raw(String::new())];
+                digits_input = Spans::from(vec![Span::raw(String::new())]);
                 self.item_digits = Some(String::new());
             }
         }
 
         let period_input;
         match self.item_period {
-            Some(ref s) => period_input = vec![Text::raw(s)],
+            Some(ref s) => period_input = Spans::from(vec![Span::raw(s)]),
             None => {
-                period_input = vec![Text::raw(String::new())];
+                period_input = Spans::from(vec![Span::raw(String::new())]);
                 self.item_period = Some(String::new());
             }
         }
@@ -504,17 +505,17 @@ impl Term {
         let selected_index = self.selected_index;
         let alternate_footer = &self.alternate_footer;
 
-        match self.terminal.draw(|mut f| {
+        match self.terminal.draw(|f| {
             let root_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Max(100), Constraint::Length(3)].as_ref())
                 .split(f.size());
 
             // Wrapping block.
-            Block::default()
-                .borders(Borders::ALL)
-                .title(title)
-                .render(&mut f, root_chunks[0]);
+            f.render_widget(
+                Block::default().borders(Borders::ALL).title(title),
+                root_chunks[0],
+            );
 
             let vert_chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -531,53 +532,65 @@ impl Term {
                 )
                 .split(root_chunks[0]);
 
-            Paragraph::new(label_input.iter())
-                .block(Block::default().borders(Borders::ALL).title("Label"))
-                .alignment(Alignment::Left)
-                .render(&mut f, vert_chunks[0]);
-            Paragraph::new(secret_input.iter())
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title("Secret (Base-32)"),
-                )
-                .alignment(Alignment::Left)
-                .render(&mut f, vert_chunks[1]);
-            Paragraph::new(digits_input.iter())
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title("Digits (6/7/8)"),
-                )
-                .alignment(Alignment::Left)
-                .render(&mut f, vert_chunks[2]);
-            Paragraph::new(period_input.iter())
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title("Period (seconds)"),
-                )
-                .alignment(Alignment::Left)
-                .render(&mut f, vert_chunks[3]);
+            f.render_widget(
+                Paragraph::new(label_input)
+                    .block(Block::default().borders(Borders::ALL).title("Label"))
+                    .alignment(Alignment::Left),
+                vert_chunks[0],
+            );
 
-            let mut text;
+            f.render_widget(
+                Paragraph::new(secret_input)
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title("Secret (Base-32)"),
+                    )
+                    .alignment(Alignment::Left),
+                vert_chunks[1],
+            );
 
-            if alternate_footer.is_empty() {
-                text = vec![Text::raw("Esc - Back")];
+            f.render_widget(
+                Paragraph::new(digits_input)
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title("Digits (6/7/8)"),
+                    )
+                    .alignment(Alignment::Left),
+                vert_chunks[2],
+            );
 
-                if selected_index == 3 {
-                    text.insert(0, Text::raw(completion_text));
-                } else {
-                    text.insert(0, Text::raw("Enter - Next      "));
-                }
+            f.render_widget(
+                Paragraph::new(period_input)
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title("Period (seconds)"),
+                    )
+                    .alignment(Alignment::Left),
+                vert_chunks[3],
+            );
+
+            let text = if alternate_footer.is_empty() {
+                Spans::from(vec![
+                    if selected_index == 3 {
+                        Span::raw(completion_text)
+                    } else {
+                        Span::raw("Enter - Next      ")
+                    },
+                    Span::raw("Esc - Back"),
+                ])
             } else {
-                text = vec![Text::raw(alternate_footer)];
-            }
+                Spans::from(vec![Span::raw(alternate_footer)])
+            };
 
-            Paragraph::new(text.iter())
-                .block(Block::default().borders(Borders::ALL))
-                .alignment(Alignment::Center)
-                .render(&mut f, root_chunks[1]);
+            f.render_widget(
+                Paragraph::new(text)
+                    .block(Block::default().borders(Borders::ALL))
+                    .alignment(Alignment::Center),
+                root_chunks[1],
+            );
         }) {
             Ok(_) => (),
             Err(_) => return Err("Could not draw the edit item menu"),
@@ -825,7 +838,7 @@ impl Term {
     }
 
     fn draw_main_menu(&mut self) -> Result<(), &'static str> {
-        let mut items: Vec<String> = Vec::new();
+        let mut items: Vec<ListItem> = Vec::new();
 
         for item in self.items.clone() {
             let code_string: String;
@@ -834,14 +847,17 @@ impl Term {
                 Err(_) => code_string = String::from("Error"), // Simple announcement because we don't want a long description overflowing the display.
             }
 
-            items.push(format!("{} - {}", item.label, code_string));
+            items.push(ListItem::new(format!("{} - {}", item.label, code_string)));
         }
 
         let copy_status = self.copy_status.clone();
         let selected_index = self.selected_index.clone();
         let alternate_footer = self.alternate_footer.clone();
+        let mut current_state = ListState::default();
 
-        match self.terminal.draw(|mut f| {
+        current_state.select(Some(selected_index));
+
+        match self.terminal.draw(|f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Max(100), Constraint::Length(3)].as_ref())
@@ -849,17 +865,20 @@ impl Term {
 
             let style = Style::default();
 
-            SelectableList::default()
-                .block(
-                    Block::default()
-                        .borders(Borders::TOP | Borders::RIGHT | Borders::LEFT | Borders::BOTTOM)
-                        .title("Main Menu"),
-                )
-                .items(&items)
-                .select(Some(selected_index))
-                .style(style)
-                .highlight_style(style.fg(Color::Magenta).modifier(Modifier::BOLD))
-                .render(&mut f, chunks[0]);
+            f.render_stateful_widget(
+                List::new(items)
+                    .block(
+                        Block::default()
+                            .borders(
+                                Borders::TOP | Borders::RIGHT | Borders::LEFT | Borders::BOTTOM,
+                            )
+                            .title("Main Menu"),
+                    )
+                    .style(style)
+                    .highlight_style(style.fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+                chunks[0],
+                &mut current_state,
+            );
 
             let text;
 
@@ -867,32 +886,34 @@ impl Term {
                 let copy_text;
                 match copy_status {
                     Status::None => {
-                        copy_text = Text::raw("c - Copy      ");
+                        copy_text = Span::raw("c - Copy      ");
                     }
                     Status::Success => {
                         copy_text =
-                            Text::styled("c - Copy      ", Style::default().fg(Color::Green));
+                            Span::styled("c - Copy      ", Style::default().fg(Color::Green));
                     }
                     Status::Fail => {
-                        copy_text = Text::styled("c - Copy      ", Style::default().fg(Color::Red));
+                        copy_text = Span::styled("c - Copy      ", Style::default().fg(Color::Red));
                     }
                 }
 
-                text = vec![
-                    Text::raw("n - New      "),
-                    Text::raw("e - Edit      "),
+                text = Spans::from(vec![
+                    Span::raw("n - New      "),
+                    Span::raw("e - Edit      "),
                     copy_text,
-                    Text::raw("r - Delete      "),
-                    Text::raw("q - Quit"),
-                ];
+                    Span::raw("r - Delete      "),
+                    Span::raw("q - Quit"),
+                ]);
             } else {
-                text = vec![Text::raw(alternate_footer)];
+                text = Spans::from(vec![Span::raw(alternate_footer)]);
             }
 
-            Paragraph::new(text.iter())
-                .block(Block::default().borders(Borders::ALL))
-                .alignment(Alignment::Center)
-                .render(&mut f, chunks[1]);
+            f.render_widget(
+                Paragraph::new(text)
+                    .block(Block::default().borders(Borders::ALL))
+                    .alignment(Alignment::Center),
+                chunks[1],
+            );
         }) {
             Ok(_) => (),
             Err(_) => return Err("Could not draw the main menu"),
@@ -916,10 +937,13 @@ impl Term {
             return;
         }
 
-        let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-        match ctx.set_contents(code) {
-            Ok(_) => self.copy_status = Status::Success,
-            Err(_) => self.copy_status = Status::Fail,
+        if let Ok(mut clipboard) = Clipboard::new() {
+            match clipboard.set_text(code) {
+                Ok(_) => self.copy_status = Status::Success,
+                Err(_) => self.copy_status = Status::Fail,
+            }
+        } else {
+            self.copy_status = Status::Fail;
         }
     }
 

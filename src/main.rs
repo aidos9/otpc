@@ -1,36 +1,33 @@
-#[macro_use]
-extern crate clap;
-use clap::{App, AppSettings, Arg};
-extern crate otpc;
+use clap::{Arg, Command};
 
 fn main() {
-    let mut app = App::new("otpc")
-        .setting(AppSettings::ArgRequiredElseHelp)
+    let mut app = Command::new("otpc")
+        .arg_required_else_help(true)
         .about("A Command Line One-Time Password client.")
-        .version(crate_version!())
+        .version("2.0.0")
         .arg(
-            Arg::with_name("new")
-                .short("n")
+            Arg::new("new")
+                .short('n')
                 .long("new")
                 .help("Add a new item"),
         )
         .arg(
-            Arg::with_name("list")
-                .short("l")
+            Arg::new("list")
+                .short('l')
                 .long("list")
                 .help("List the stored items and their current code"),
         )
         .arg(
-            Arg::with_name("remove")
-                .short("r")
+            Arg::new("remove")
+                .short('r')
                 .long("remove")
                 .help("Remove the specified item")
                 .value_name("LABEL")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("code")
-                .short("c")
+            Arg::new("code")
+                .short('c')
                 .long("code")
                 .help("Get the current code of an item")
                 .takes_value(true)
@@ -39,8 +36,8 @@ fn main() {
 
     if cfg!(feature = "interactive") {
         app = app.arg(
-            Arg::with_name("interactive")
-                .short("i")
+            Arg::new("interactive")
+                .short('i')
                 .long("interactive")
                 .help("Enter interactive mode"),
         );

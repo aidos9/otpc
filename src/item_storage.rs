@@ -1,5 +1,4 @@
 use crate::item::Item;
-use std::error::Error;
 use std::fs::OpenOptions;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
@@ -36,12 +35,12 @@ pub fn write_items(path: &String, items: &Vec<Item>) -> Result<(), String> {
                         let _ = writer.flush();
                         return Ok(());
                     }
-                    Err(e) => return Err(String::from(e.description())),
+                    Err(e) => return Err(e.to_string()),
                 },
-                Err(e) => return Err(String::from(e.description())),
+                Err(e) => return Err(e.to_string()),
             }
         }
-        Err(e) => return Err(String::from(e.description())),
+        Err(e) => return Err(e.to_string()),
     }
 }
 
@@ -55,9 +54,9 @@ pub fn retrieve_items(path: &String) -> Result<Vec<Item>, String> {
             let reader = BufReader::new(file);
             match serde_json::from_reader(reader) {
                 Ok(items) => return Ok(items),
-                Err(e) => return Err(String::from(e.description())),
+                Err(e) => return Err(e.to_string()),
             }
         }
-        Err(e) => return Err(String::from(e.description())),
+        Err(e) => return Err(e.to_string()),
     }
 }

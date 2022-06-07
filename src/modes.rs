@@ -1,12 +1,10 @@
+use crate::interactive;
 use crate::item::{Digits, Item};
+use crate::item_storage;
 use crate::item_storage::{storage_location, storage_location_exists};
-use std::error::Error;
+use crate::util::{contains_item_label, is_base_32, is_number};
 use std::fs;
 use std::io::{stdin, stdout, Write};
-use crate::util::{contains_item_label, is_base_32, is_number};
-use crate::interactive;
-use crate::item_storage;
-
 
 #[cfg(feature = "interactive")]
 pub fn run_interactive() {
@@ -312,7 +310,7 @@ pub fn run_startup_checks() -> Option<String> {
                     Err(e) => {
                         return Some(format!(
                             "An error occurred whilst making the storage directory: {}",
-                            e.description()
+                            e
                         ))
                     }
                 }
